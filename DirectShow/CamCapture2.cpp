@@ -221,8 +221,8 @@ static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
 	return hr;
 }
 
-static HRESULT VideoCapture(int &cam_num)
-//int main()
+//static HRESULT VideoCapture(int &cam_num)
+int main()
 {
 	HRESULT hr;
 
