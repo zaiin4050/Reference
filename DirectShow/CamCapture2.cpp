@@ -15,6 +15,8 @@
 #pragma comment(lib, "Ole32.lib")
 #pragma comment(lib, "Windowscodecs.lib")
 
+HWND ghApp = 0;
+
 using namespace std;
 
 // NullRender
@@ -231,6 +233,8 @@ static HRESULT GetInterfaces()
 	hr = CoCreateInstance(CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER,
 		IID_IBaseFilter, (LPVOID *)&pSgrabberF);
 
+	// Videowindow
+
 	// Get interfaces
 	hr = pSgrabberF->QueryInterface(IID_ISampleGrabber, (LPVOID *)&pSampleGrabber);
 	hr = pGraph->QueryInterface(IID_IMediaControl, (void **)&pMC);
@@ -244,7 +248,6 @@ static void ReleaseInterfaces()
 	pVW->Release();
 	pME->Release();
 	pNullRenderer->Release();
-
 }
 
 static HRESULT Read(IBaseFilter *pSrc)
@@ -302,16 +305,21 @@ static HRESULT Read(IBaseFilter *pSrc)
 	// You can use SetBufferSamples after Run() too.
 	hr = pSampleGrabber->SetBufferSamples(TRUE);
 
+	// VideoWindow Setting
+	//http://telnet.or.kr/directx/htm/ivideowindowinterface.htm
+	pVW->put_AutoShow(OAFALSE);
+	//pVW->SetWindowPosition(0, 0, 0, 0);
+
 	// Start playing
 	pMC->Run();
 
 	// Block execution
-	//MessageBox(NULL,
-	//	"Block Execution",
-	//	"Block",
-	//	MB_OK);
+	MessageBox(NULL,
+		"Block Execution",
+		"Block",
+		MB_OK);
 
-	Sleep(10);
+	//Sleep(10000);
 
 	// JPG will be get after "OK" or "1000msec" is pressed
 
@@ -357,17 +365,17 @@ static HRESULT Read(IBaseFilter *pSrc)
 	return hr;
 }
 
-int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int nCmdShow)
+//int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int nCmdShow)
+int main()
 {
 	HRESULT hr;
-	
 
 	hr = GetInterfaces();
 
 	// Initialize the Capture Graph Builder
 	hr = pCapture->SetFiltergraph(pGraph);
 
-	vector<string> names = { "UVC Camera", "HD USB Camera" };
+	vector<string> names = { "UVC Camera", "ABKO APC930 QHD WEBCAM" };
 	/*vector<string> names;
 	if (SUCCEEDED(hr)) {
 		DisplayDeviceInformation(names);
@@ -376,11 +384,9 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int n
 		printf("%d : %s\n", i, names[i].c_str());
 	}
 	*/
-	//int total = names.size();
-	int cam = 1;
 
 	IBaseFilter *pSrc = NULL;
-	hr = VideoCapture(names[0], &pSrc);
+	hr = VideoCapture(names[1], &pSrc);
 	hr = Read(pSrc);
 
 	ReleaseInterfaces();
