@@ -140,8 +140,8 @@ static char * ConvertWCtoC(wchar_t* str)
 }
 static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
 {	
-	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-	IEnumMoniker *pEnum;
+	//HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	//IEnumMoniker *pEnum;
 
 	HRESULT hr = S_OK;
 	IBaseFilter * pSrc = NULL;
