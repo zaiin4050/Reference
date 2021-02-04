@@ -17,6 +17,21 @@
 
 using namespace std;
 
+// NullRender
+IBaseFilter *pNullRenderer = NULL;
+
+// Added for the ICaptureGraphBuilder2
+IGraphBuilder * pGraph = NULL;
+ICaptureGraphBuilder2 * pCapture = NULL;
+
+// Added for the SampleGrabber
+ISampleGrabber *pSampleGrabber = NULL;
+IBaseFilter *pSgrabberF = NULL;
+
+IVideoWindow  * pVW = NULL;
+IMediaControl * pMC = NULL;
+IMediaEventEx * pME = NULL;
+
 static void Win32DecodeJpeg(unsigned int ImageDataSize, void *ImageData,
 	unsigned int DestSize, void *Dest)
 {
@@ -138,30 +153,22 @@ static char * ConvertWCtoC(wchar_t* str)
 	WideCharToMultiByte(CP_ACP, 0, str, -1, pStr, strSize, 0, 0);
 	return pStr;
 }
-//static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
-static HRESULT FindDevice(vector<string> &names)
-{
-	IEnumMoniker *pEnum;
-
-	HRESULT hr = S_OK;
-	IBaseFilter * pSrc = NULL;
+static HRESULT VideoCapture(string &Devname, IBaseFilter ** ppSrcFilter)
+{	
+	HRESULT hr;
 	IMoniker* pMoniker = NULL;
 	ICreateDevEnum *pDevEnum = NULL;
-	IEnumMoniker *pClassEnum = NULL;
+	IEnumMoniker *pEnum = NULL;
 
-	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+	hr = CoCreateInstance(CLSID_VideoInputDeviceCategory, NULL, CLSCTX_INPROC,
 		IID_ICreateDevEnum, (void **)&pDevEnum);
-
-	//vector<string> names;
-
 	if (SUCCEEDED(hr))
 	{
-		hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
-		if (SUCCEEDED(hr)) {
-			ULONG cFetched;
-			int num = 1;
-			while (pClassEnum->Next(1, &pMoniker, &cFetched) == S_OK)
-			{
+		// Create an enumerator for the category.
+		hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pEnum, 0);
+		if (SUCCEEDED(hr)){
+			// cam setting
+			while ((hr = pEnum->Next(1, &pMoniker, NULL)) == S_OK) {
 				IPropertyBag *pPropBag;
 				hr = pMoniker->BindToStorage(0, 0, IID_IPropertyBag,
 					(void **)&pPropBag);
@@ -174,89 +181,40 @@ static HRESULT FindDevice(vector<string> &names)
 					if (SUCCEEDED(hr))
 					{
 						// Display the name in your UI somehow.
-						//printf("%d : %S\n", num, varName.bstrVal);
+						printf("11111%S\n", varName.bstrVal);
 						char* name = ConvertWCtoC(varName.bstrVal);
-						names.push_back(name);
-						delete[] name;
-						VariantClear(&varName);
-						/*++num;*/
+						if (name == Devname) {
+							VariantClear(&varName);
+
+							//To create an instance of the filter, do the following:
+							IBaseFilter *pFilter;
+							hr = pMoniker->BindToObject(NULL, NULL, IID_IBaseFilter,
+								(void**)ppSrcFilter);
+
+							pDevEnum->Release();
+							pEnum->Release();
+							pMoniker->Release();
+							pPropBag->Release();
+
+							return hr;
+						}
 					}
-					//To create an instance of the filter, do the following:
-					IBaseFilter *pSrc;
-					hr = pMoniker->BindToObject(NULL, NULL, IID_IBaseFilter,
-						(void**)&pSrc);
+					VariantClear(&varName);
 				}
 				pMoniker->Release();
 				pPropBag->Release();
 			}
-			pClassEnum->Release();
-			pDevEnum->Release();
 		}
-		return hr;
 	}
+	pDevEnum->Release();
+	pEnum->Release();
+	return hr;
 }
-
-//	if (SUCCEEDED(hr))
-//	{
-//		hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
-//		hr = pClassEnum->Next(1, &pMoniker, NULL); // 마지막 카메라
-//		pMoniker->Release();
-//		hr = pClassEnum->Next(1, &pMoniker, NULL); // 그 앞의 카메라
-//		hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void**)&pSrc);
-//
-//		if (hr == S_FALSE)
-//		{
-//			//Msg(TEXT("Unable to access video capture device!"));
-//			hr = E_FAIL;
-//		}
-//	}
-//	if (SUCCEEDED(hr))
-//	{
-//		*ppSrcFilter = pSrc;
-//		(*ppSrcFilter)->AddRef();
-//	}
-//	pSrc->Release();
-//	pMoniker->Release();
-//	pDevEnum->Release();
-//	pClassEnum->Release();
-//
-//	return hr;
-//}
-
-static HRESULT VideoCapture(int cam_num, int total_num)
-//int main()
+static HRESULT GetInterfaces()
 {
 	HRESULT hr;
-	// GLOBAL POINTER
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
-	IGraphBuilder * pGraph = NULL;
-	ICaptureGraphBuilder2 * pCapture = NULL;
-	IBaseFilter *pSrc = NULL;
-	IVideoWindow  * pVW = NULL;
-	IMediaControl * pMC = NULL;
-	IMediaEventEx * pME = NULL;
-	
-	// Enumerator
-	IMoniker* pMoniker = NULL;
-	ICreateDevEnum *pDevEnum = NULL;
-	IEnumMoniker *pClassEnum = NULL;
-
-	IBaseFilter *pSrcFilter = NULL;
-
-	// Capture
-	IBaseFilter *pMux = NULL;
-
-	// NullRender
-	IBaseFilter *pNullRenderer = NULL;
-
-	// Added for the SampleGrabber
-	ISampleGrabber *pSampleGrabber = NULL;
-	IBaseFilter *pSgrabberF = NULL;
-	IPin *pSrcPin = NULL;
-	IPin *pGrabPin = NULL;
-	AM_MEDIA_TYPE am_media_type;
-
-	// NullRender
 	hr = CoCreateInstance(CLSID_NullRenderer, NULL, CLSCTX_INPROC_SERVER,
 		IID_IBaseFilter, (void **)&pNullRenderer);
 
@@ -269,9 +227,6 @@ static HRESULT VideoCapture(int cam_num, int total_num)
 		CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2,
 		(void **)&pCapture);
 
-	// Initialize the Capture Graph Builder
-	hr = pCapture->SetFiltergraph(pGraph);
-
 	//Create SampleGrabber
 	hr = CoCreateInstance(CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER,
 		IID_IBaseFilter, (LPVOID *)&pSgrabberF);
@@ -281,28 +236,34 @@ static HRESULT VideoCapture(int cam_num, int total_num)
 	hr = pGraph->QueryInterface(IID_IMediaControl, (void **)&pMC);
 	hr = pGraph->QueryInterface(IID_IMediaEvent, (void **)&pME);
 	hr = pGraph->QueryInterface(IID_IVideoWindow, (void **)&pVW);
+	                  
+	return hr;
+}
+static void ReleaseInterfaces() 
+{
+	pVW->Release();
+	pME->Release();
+	pNullRenderer->Release();
 
-	// Find video device
-	//hr = SettingCam(&pSrc);
+}
 
-	// create enumerator
-	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
-		IID_ICreateDevEnum, (void **)&pDevEnum);
-	hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
+static HRESULT Read(IBaseFilter *pSrc)
+//int main()
+{
+	HRESULT hr;
+	// GLOBAL POINTER
 
-	// cam setting
-	int loop = total_num - cam_num;
-	for (int i = 0; i < loop; i++) {
-		hr = pClassEnum->Next(1, &pMoniker, NULL);
-		pMoniker->Release();
-	}
-	hr = pClassEnum->Next(1, &pMoniker, NULL);
+	IBaseFilter *pSrcFilter = NULL;
 
-	hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void **)&pSrc);
-	
+	// Capture
+	IBaseFilter *pMux = NULL;
+
+	IPin *pSrcPin = NULL;
+	IPin *pGrabPin = NULL;
+	AM_MEDIA_TYPE am_media_type;
+
 	hr = pGraph->AddFilter(pSrc, L"Video Capture");
 	hr = pGraph->AddFilter(pSgrabberF, L"Sample Grabber");
-	hr = pGraph->AddFilter(pNullRenderer, L"Null Renderer");
 
 	hr = pGraph->Connect(pSrcPin, pGrabPin);
 
@@ -345,12 +306,12 @@ static HRESULT VideoCapture(int cam_num, int total_num)
 	pMC->Run();
 
 	// Block execution
-	MessageBox(NULL,
-		"Block Execution",
-		"Block",
-		MB_OK);
+	//MessageBox(NULL,
+	//	"Block Execution",
+	//	"Block",
+	//	MB_OK);
 
-	//Sleep(1000);
+	Sleep(10);
 
 	// JPG will be get after "OK" or "1000msec" is pressed
 
@@ -370,7 +331,7 @@ static HRESULT VideoCapture(int cam_num, int total_num)
 	DWORD nWritten;
 
 	char filename[12];
-	sprintf(filename, "result", "%d", cam_num, ".jpg");
+	sprintf(filename, "result.jpg");
 
 	// save Format
 	fh = CreateFile(filename,
@@ -388,6 +349,7 @@ static HRESULT VideoCapture(int cam_num, int total_num)
 	pSgrabberF->Release();
 	pMC->Release();
 	pGraph->Release();
+	pCapture->Release();
 
 	// finish COM
 	CoUninitialize();
@@ -395,19 +357,31 @@ static HRESULT VideoCapture(int cam_num, int total_num)
 	return hr;
 }
 
-int main()
+int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int nCmdShow)
 {
 	HRESULT hr;
-	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-
-	vector<string> names;
-	hr = FindDevice(names);
-
-	for (int i = 0; i < names.size(); i++) {
-		printf("%d : %s\n",i, names[i].c_str());
-	}
 	
-	int total = names.size();
+
+	hr = GetInterfaces();
+
+	// Initialize the Capture Graph Builder
+	hr = pCapture->SetFiltergraph(pGraph);
+
+	vector<string> names = { "UVC Camera", "HD USB Camera" };
+	/*vector<string> names;
+	if (SUCCEEDED(hr)) {
+		DisplayDeviceInformation(names);
+	}
+	for (int i = 0; i < names.size(); i++) {
+		printf("%d : %s\n", i, names[i].c_str());
+	}
+	*/
+	//int total = names.size();
 	int cam = 1;
-	hr = VideoCapture(cam, total);
+
+	IBaseFilter *pSrc = NULL;
+	hr = VideoCapture(names[0], &pSrc);
+	hr = Read(pSrc);
+
+	ReleaseInterfaces();
 }
