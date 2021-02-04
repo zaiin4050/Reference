@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 
 #include <dshow.h>
@@ -5,7 +6,6 @@
 #include <Windows.h>
 #include <atlconv.h>
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <Wincodec.h>
 #include <stdio.h>
 #include <fstream>
@@ -138,10 +138,10 @@ static char * ConvertWCtoC(wchar_t* str)
 	WideCharToMultiByte(CP_ACP, 0, str, -1, pStr, strSize, 0, 0);
 	return pStr;
 }
-static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
-{	
-	//HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-	//IEnumMoniker *pEnum;
+//static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
+static HRESULT FindDevice(vector<string> &names)
+{
+	IEnumMoniker *pEnum;
 
 	HRESULT hr = S_OK;
 	IBaseFilter * pSrc = NULL;
@@ -152,7 +152,7 @@ static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
 	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (void **)&pDevEnum);
 
-	vector<string> names;
+	//vector<string> names;
 
 	if (SUCCEEDED(hr))
 	{
@@ -174,59 +174,59 @@ static HRESULT SettingCam(IBaseFilter ** ppSrcFilter)
 					if (SUCCEEDED(hr))
 					{
 						// Display the name in your UI somehow.
-						printf("%d : %S\n", num, varName.bstrVal);
+						//printf("%d : %S\n", num, varName.bstrVal);
 						char* name = ConvertWCtoC(varName.bstrVal);
 						names.push_back(name);
 						delete[] name;
-						++num;
+						VariantClear(&varName);
+						/*++num;*/
 					}
-					VariantClear(&varName);
-
 					//To create an instance of the filter, do the following:
-					IBaseFilter *pFilter;
+					IBaseFilter *pSrc;
 					hr = pMoniker->BindToObject(NULL, NULL, IID_IBaseFilter,
-						(void**)&pFilter);
+						(void**)&pSrc);
 				}
 				pMoniker->Release();
 				pPropBag->Release();
 			}
 			pClassEnum->Release();
+			pDevEnum->Release();
 		}
-		//pDevEnum->Release();
+		return hr;
 	}
-	if (SUCCEEDED(hr))
-	{
-		hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
-		hr = pClassEnum->Next(1, &pMoniker, NULL); // 마지막 카메라
-		pMoniker->Release();
-		hr = pClassEnum->Next(1, &pMoniker, NULL); // 그 앞의 카메라
-		hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void**)&pSrc);
-
-		if (hr == S_FALSE)
-		{
-			//Msg(TEXT("Unable to access video capture device!"));
-			hr = E_FAIL;
-		}
-	}
-	if (SUCCEEDED(hr))
-	{
-		*ppSrcFilter = pSrc;
-		(*ppSrcFilter)->AddRef();
-	}
-	pSrc->Release();
-	pMoniker->Release();
-	pDevEnum->Release();
-	pClassEnum->Release();
-
-	return hr;
 }
 
-//static HRESULT VideoCapture(int &cam_num)
-int main()
+//	if (SUCCEEDED(hr))
+//	{
+//		hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
+//		hr = pClassEnum->Next(1, &pMoniker, NULL); // 마지막 카메라
+//		pMoniker->Release();
+//		hr = pClassEnum->Next(1, &pMoniker, NULL); // 그 앞의 카메라
+//		hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void**)&pSrc);
+//
+//		if (hr == S_FALSE)
+//		{
+//			//Msg(TEXT("Unable to access video capture device!"));
+//			hr = E_FAIL;
+//		}
+//	}
+//	if (SUCCEEDED(hr))
+//	{
+//		*ppSrcFilter = pSrc;
+//		(*ppSrcFilter)->AddRef();
+//	}
+//	pSrc->Release();
+//	pMoniker->Release();
+//	pDevEnum->Release();
+//	pClassEnum->Release();
+//
+//	return hr;
+//}
+
+static HRESULT VideoCapture(int cam_num, int total_num)
+//int main()
 {
 	HRESULT hr;
-
-	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	// GLOBAL POINTER
 
 	IGraphBuilder * pGraph = NULL;
@@ -283,27 +283,28 @@ int main()
 	hr = pGraph->QueryInterface(IID_IVideoWindow, (void **)&pVW);
 
 	// Find video device
-	hr = SettingCam(&pSrc);
+	//hr = SettingCam(&pSrc);
 
 	// create enumerator
-	//hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
-	//	IID_ICreateDevEnum, (void **)&pDevEnum);
-	//hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
-	//hr = pClassEnum->Next(1, &pMoniker, NULL);
-	//hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void **)&pSrc);
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+		IID_ICreateDevEnum, (void **)&pDevEnum);
+	hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
+
+	// cam setting
+	int loop = total_num - cam_num;
+	for (int i = 0; i < loop; i++) {
+		hr = pClassEnum->Next(1, &pMoniker, NULL);
+		pMoniker->Release();
+	}
+	hr = pClassEnum->Next(1, &pMoniker, NULL);
+
+	hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void **)&pSrc);
 	
 	hr = pGraph->AddFilter(pSrc, L"Video Capture");
 	hr = pGraph->AddFilter(pSgrabberF, L"Sample Grabber");
 	hr = pGraph->AddFilter(pNullRenderer, L"Null Renderer");
 
-
-	/*pSrcPin = GetOutPin(pSrc, PINDIR_OUTPUT, 0);
-	pGrabPin = GetInPin(pSgrabberF, PINDIR_INPUT, 0);*/
-
 	hr = pGraph->Connect(pSrcPin, pGrabPin);
-
-	// Renderstream methods ( Preview )
-	//hr = pCapture->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, pSrc, NULL, NULL);
 
 	// Renderstream methods ( Capture )
 	hr = pCapture->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, pSrc, NULL, NULL);
@@ -334,10 +335,10 @@ int main()
 	printf("sample size = %d\n",
 		am_media_type.lSampleSize);
 
-	//	// Configure SampleGrabber to do grabbing.
-//	// Buffer data can not be obtained if you
-//	// do not use SetBufferSamples.
-//	// You can use SetBufferSamples after Run() too.
+	// Configure SampleGrabber to do grabbing.
+	// Buffer data can not be obtained if you
+	// do not use SetBufferSamples.
+	// You can use SetBufferSamples after Run() too.
 	hr = pSampleGrabber->SetBufferSamples(TRUE);
 
 	// Start playing
@@ -351,7 +352,7 @@ int main()
 
 	//Sleep(1000);
 
-	// BITMAP will be saved after OK is pressed
+	// JPG will be get after "OK" or "1000msec" is pressed
 
 	// prepare buffer
 	long nBufferSize = am_media_type.lSampleSize;
@@ -359,43 +360,26 @@ int main()
 	vector<long> pBuffer(nBufferSize);
 
 	// grab image data.
-	//hr = pSampleGrabber->GetCurrentBuffer(&nBufferSize, // use malloc
-	//	pBuffer);
-	hr = pSampleGrabber->GetCurrentBuffer(&nBufferSize,
-		pBuffer.data());
+	//hr = pSampleGrabber->GetCurrentBuffer(&nBufferSize, pBuffer); // use malloc
+	hr = pSampleGrabber->GetCurrentBuffer(&nBufferSize, pBuffer.data());
 
-	//
-	// Save image data as Bitmap.
+	// Save image data as JPG.
 	// This is just to make this sample easily understandable.
 	//
 	HANDLE fh;
-	BITMAPFILEHEADER bmphdr;
 	DWORD nWritten;
 
-	//// BMP
-	//memset(&bmphdr, 0, sizeof(bmphdr));
-
-	//bmphdr.bfType = ('M' << 8) | 'B';
-	//bmphdr.bfSize = sizeof(bmphdr) + sizeof(BITMAPINFOHEADER) + nBufferSize;
-	//bmphdr.bfOffBits = sizeof(bmphdr) + sizeof(BITMAPINFOHEADER);
+	char filename[12];
+	sprintf(filename, "result", "%d", cam_num, ".jpg");
 
 	// save Format
-	fh = CreateFile("result222.jpg",
+	fh = CreateFile(filename,
 		GENERIC_WRITE, 0, NULL,
 		CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-
-	//// BMP
-	//WriteFile(fh, &bmphdr, sizeof(bmphdr), &nWritten, NULL);
-	//WriteFile(fh,
-	//	&pVideoInfoHeader->bmiHeader,
-	//	sizeof(BITMAPINFOHEADER), &nWritten, NULL);
-	//WriteFile(fh, pBuffer, nBufferSize, &nWritten, NULL);
-	//CloseHandle(fh);
 
 	// JPG
 	//WriteFile(fh, pBuffer, nBufferSize, &nWritten, NULL); // use malloc
 	WriteFile(fh, pBuffer.data(), nBufferSize, &nWritten, NULL);
-
 
 	//free(pBuffer); // use malloc
 
@@ -413,5 +397,17 @@ int main()
 
 int main()
 {
+	HRESULT hr;
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
+	vector<string> names;
+	hr = FindDevice(names);
+
+	for (int i = 0; i < names.size(); i++) {
+		printf("%d : %s\n",i, names[i].c_str());
+	}
+	
+	int total = names.size();
+	int cam = 1;
+	hr = VideoCapture(cam, total);
 }
