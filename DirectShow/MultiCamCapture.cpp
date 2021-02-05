@@ -211,13 +211,13 @@ static HRESULT VideoCapture(string &Devname, IBaseFilter ** ppSrcFilter)
 	pEnum->Release();
 	return hr;
 }
-static HRESULT GetInterfaces()
+static HRESULT GetInterfaces(int Cam_num)
 {
 	HRESULT hr;
 	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
 	// Create Filtergraph
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < Cam_num; i++) {
 		hr = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER,
 			IID_IGraphBuilder, (void **)&pGraph[i]);
 
@@ -255,50 +255,49 @@ static HRESULT AddSampleGrabber(vector<IBaseFilter *> pSrc)
 {
 	HRESULT hr;
 	for (int i = 0; i < pSrc.size(); i++) {
-
 		hr = pGraph[i]->AddFilter(pSrc[i], L"Video Capture");
 		hr = pGraph[i]->AddFilter(pSgrabberF[i], L"Sample Grabber");
 
 		// Renderstream methods ( Capture )
 		hr = pCapture[i]->RenderStream(&PIN_CATEGORY_CAPTURE, 0, pSrc[i], NULL, NULL);
+		if (SUCCEEDED(hr)) {
+			// SampleGrabber
+			ZeroMemory(&am_media_type, sizeof(am_media_type));
+			am_media_type.majortype = MEDIATYPE_Video;
+			am_media_type.subtype = MEDIASUBTYPE_RGB24;
+			am_media_type.formattype = FORMAT_VideoInfo;
+			pSampleGrabber[i]->SetMediaType(&am_media_type);
 
-		// SampleGrabber
-		ZeroMemory(&am_media_type, sizeof(am_media_type));
-		am_media_type.majortype = MEDIATYPE_Video;
-		am_media_type.subtype = MEDIASUBTYPE_RGB24;
-		am_media_type.formattype = FORMAT_VideoInfo;
-		pSampleGrabber[i]->SetMediaType(&am_media_type);
+			// Get connection information.
+			// This must be done after the Graph is created
+			// by RenderFile.
+			hr = pSampleGrabber[i]->GetConnectedMediaType(&am_media_type);
+			//VIDEOINFOHEADER *pVideoInfoHeader =
+			//	(VIDEOINFOHEADER *)am_media_type.pbFormat;
 
-		// Get connection information.
-		// This must be done after the Graph is created
-		// by RenderFile.
-		hr = pSampleGrabber[i]->GetConnectedMediaType(&am_media_type);
-		//VIDEOINFOHEADER *pVideoInfoHeader =
-		//	(VIDEOINFOHEADER *)am_media_type.pbFormat;
+			// Print the width and height of the image.
+			// This is just to make the sample understandable.
+			// This is not a required feature.
+			//printf("size = %dx%d\n",
+			//	pVideoInfoHeader->bmiHeader.biWidth,
+			//	pVideoInfoHeader->bmiHeader.biHeight);
 
-		// Print the width and height of the image.
-		// This is just to make the sample understandable.
-		// This is not a required feature.
-		//printf("size = %dx%d\n",
-		//	pVideoInfoHeader->bmiHeader.biWidth,
-		//	pVideoInfoHeader->bmiHeader.biHeight);
+			// Print the data size.
+			// This is just for understanding too.
+			//printf("sample size = %d\n",
+			//	am_media_type.lSampleSize);
 
-		// Print the data size.
-		// This is just for understanding too.
-		//printf("sample size = %d\n",
-		//	am_media_type.lSampleSize);
-
-		// Configure SampleGrabber to do grabbing.
-		// Buffer data can not be obtained if you
-		// do not use SetBufferSamples.
-		// You can use SetBufferSamples after Run() too.
-		hr = pSampleGrabber[i]->SetBufferSamples(TRUE);
-		printf("%s\n", "addsamplegrabber");
+			// Configure SampleGrabber to do grabbing.
+			// Buffer data can not be obtained if you
+			// do not use SetBufferSamples.
+			// You can use SetBufferSamples after Run() too.
+			hr = pSampleGrabber[i]->SetBufferSamples(TRUE);
+			printf("%s\n", "addsamplegrabber");
+		}
 	}
 	return hr;
 }
-static HRESULT Read(vector<vector<long>> &pBuffer)
-//int main()
+static HRESULT Run()
 {
 	HRESULT hr;
 
@@ -310,10 +309,13 @@ static HRESULT Read(vector<vector<long>> &pBuffer)
 
 	// Start playing
 	for (int i = 0; i < pMC.size(); i++) {
-		pMC[i]->Run();
+		hr = pMC[i]->Run();
+		if (FAILED(hr)) {
+			return hr;
+		}
 	}
 
-	 //Block execution
+	//Block execution
 	MessageBox(NULL,
 		"Block Execution",
 		"Block",
@@ -322,7 +324,12 @@ static HRESULT Read(vector<vector<long>> &pBuffer)
 	//Sleep(10000);
 
 	// JPG will be get after "OK" or "1000msec" is pressed
-
+	return hr;
+}
+static HRESULT Read(vector<vector<long>> &pBuffer)
+//int main()
+{
+	HRESULT hr;
 	// prepare buffer
 	for (int i = 0; i < pSampleGrabber.size(); i++) {
 		long nBufferSize = 1920 * 1080 * 3;
@@ -331,8 +338,8 @@ static HRESULT Read(vector<vector<long>> &pBuffer)
 		// grab image data.
 		//hr = pSampleGrabber->GetCurrentBuffer(&nBufferSize, pBuffer); // use malloc
 		hr = pSampleGrabber[i]->GetCurrentBuffer(&nBufferSize, Buf.data());
-
-		// Save image data as JPG.
+		if (SUCCEEDED(hr)) {
+			// Save image data as JPG.
 		// This is just to make this sample easily understandable.
 		//
 		//HANDLE fh;
@@ -353,21 +360,20 @@ static HRESULT Read(vector<vector<long>> &pBuffer)
 
 		//pBuffer.push_back(pBuf);
 		//free(pBuffer); // use malloc
-    
-    // Get Binary Data
-		int ImageWidth = 1920;
-		int ImageHeight = 1080;
-		int DecodedBufferSize = ImageWidth * ImageHeight * 3;
-		Win32DecodeJpeg(nBufferSize, Buf.data(), DecodedBufferSize, pBuffer[i].data());
+			int ImageWidth = 1920;
+			int ImageHeight = 1080;
+			int DecodedBufferSize = ImageWidth * ImageHeight * 3;
+			Win32DecodeJpeg(nBufferSize, Buf.data(), DecodedBufferSize, pBuffer[i].data());
 
-		char filename[15];
+			char filename[15];
 
-		sprintf(filename, "result_%d.bin", i);
+			sprintf(filename, "result_%d.bin", i);
 
-		ofstream ofs(filename, ios::binary);
-		ofs.write((char*)pBuffer[i].data(), DecodedBufferSize);
-		ofs.close();
-
+			ofstream ofs(filename, ios::binary);
+			ofs.write((char*)pBuffer[i].data(), DecodedBufferSize);
+			ofs.close();
+		}
+		
 		// Release
 		pSampleGrabber[i]->Release();
 		pSgrabberF[i]->Release();
@@ -384,22 +390,26 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int n
 {
 	HRESULT hr;
 
-	hr = GetInterfaces();
+	vector<string> names = { "UVC Camera", "HD USB Camera" }; // , "ABKO APC930 QHD WEBCAM"
 
-	vector<string> names = { "UVC Camera", "HD USB Camera"}; // , "ABKO APC930 QHD WEBCAM"
+	int cam_num = names.size();
+	hr = GetInterfaces(cam_num);
+	if (SUCCEEDED(hr)) {
+		vector<IBaseFilter *> pSrc(cam_num);
 
-	vector<IBaseFilter *> pSrc(names.size());
+		for (int i = 0; i < names.size(); i++) {
+			hr = VideoCapture(names[i], &pSrc[i]);
+		}
 
-	for (int i = 0; i < names.size(); i++) {
-		hr = VideoCapture(names[i], &pSrc[i]);
+		hr = AddSampleGrabber(pSrc);
+		if (SUCCEEDED(hr)) {
+			long nBufferSize = 1920 * 1080 * 3;
+			vector<vector<long>> pBuffer(cam_num, vector<long>(nBufferSize));
+
+			hr = Run();
+
+			hr = Read(pBuffer);
+		}	
 	}
-
-	hr = AddSampleGrabber(pSrc);
-
-	long nBufferSize = 1920 * 1080 * 3;
-	vector<vector<long>> pBuffer(names.size(), vector<long> (nBufferSize));
-
-	hr = Read(pBuffer);
-
 	ReleaseInterfaces();
 }
