@@ -155,7 +155,7 @@ static char * ConvertWCtoC(wchar_t* str)
 	return pStr;
 }
 static HRESULT VideoCapture(string &Devname, IBaseFilter ** ppSrcFilter)
-{	
+{
 	HRESULT hr;
 	IMoniker* pMoniker = NULL;
 	ICreateDevEnum *pDevEnum = NULL;
@@ -167,7 +167,7 @@ static HRESULT VideoCapture(string &Devname, IBaseFilter ** ppSrcFilter)
 	{
 		// Create an enumerator for the category.
 		hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pEnum, 0);
-		if (SUCCEEDED(hr)){
+		if (SUCCEEDED(hr)) {
 			// cam setting
 			while ((hr = pEnum->Next(1, &pMoniker, NULL)) == S_OK) {
 				IPropertyBag *pPropBag;
@@ -243,8 +243,8 @@ static HRESULT GetInterfaces(int Cam_num)
 	}
 	return hr;
 }
-static void ReleaseInterfaces() 
-{	
+static void ReleaseInterfaces()
+{
 	for (int i = 0; i < pMC.size(); i++) {
 		pMC[i]->Release();
 		pVW[i]->Release();
@@ -316,12 +316,12 @@ static HRESULT Run()
 	}
 
 	//Block execution
-	MessageBox(NULL,
-		"Block Execution",
-		"Block",
-		MB_OK);
+	//MessageBox(NULL,
+	//	"Block Execution",
+	//	"Block",
+	//	MB_OK);
 
-	//Sleep(10000);
+	Sleep(10);
 
 	// JPG will be get after "OK" or "1000msec" is pressed
 	return hr;
@@ -340,40 +340,39 @@ static HRESULT Read(vector<vector<long>> &pBuffer)
 		hr = pSampleGrabber[i]->GetCurrentBuffer(&nBufferSize, Buf.data());
 		if (SUCCEEDED(hr)) {
 			// Save image data as JPG.
-		// This is just to make this sample easily understandable.
-		//
-		//HANDLE fh;
-		//DWORD nWritten;
+			// This is just to make this sample easily understandable.
+			//
+			HANDLE fh;
+			DWORD nWritten;
 
-		//char filename[15];
+			char filename_jpg[15];
 
-		//sprintf(filename, "result_%d.jpg", i);
+			sprintf(filename_jpg, "result_%d.jpg", i);
 
-		// save Format
-		//fh = CreateFile(filename,
-		//	GENERIC_WRITE, 0, NULL,
-		//	CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			// save Format
+			fh = CreateFile(filename_jpg,
+				GENERIC_WRITE, 0, NULL,
+				CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-		// JPG
-		//WriteFile(fh, pBuffer, nBufferSize, &nWritten, NULL); // use malloc
-		//WriteFile(fh, pBuffer[i].data(), nBufferSize, &nWritten, NULL);
+			// JPG
+			//WriteFile(fh, pBuffer, nBufferSize, &nWritten, NULL); // use malloc
+			WriteFile(fh, Buf.data(), nBufferSize, &nWritten, NULL);
 
-		//pBuffer.push_back(pBuf);
-		//free(pBuffer); // use malloc
+			//pBuffer.push_back(pBuf);
+			//free(pBuffer); // use malloc
 			int ImageWidth = 1920;
 			int ImageHeight = 1080;
 			int DecodedBufferSize = ImageWidth * ImageHeight * 3;
 			Win32DecodeJpeg(nBufferSize, Buf.data(), DecodedBufferSize, pBuffer[i].data());
 
-			char filename[15];
+			char filename_bin[15];
+			sprintf(filename_bin, "result_%d.bin", i);
 
-			sprintf(filename, "result_%d.bin", i);
-
-			ofstream ofs(filename, ios::binary);
+			ofstream ofs(filename_bin, ios::binary);
 			ofs.write((char*)pBuffer[i].data(), DecodedBufferSize);
 			ofs.close();
 		}
-		
+
 		// Release
 		pSampleGrabber[i]->Release();
 		pSgrabberF[i]->Release();
@@ -385,12 +384,12 @@ static HRESULT Read(vector<vector<long>> &pBuffer)
 	return hr;
 }
 
-int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int nCmdShow)
-//int main()
+//int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int nCmdShow)
+int main()
 {
 	HRESULT hr;
 
-	vector<string> names = { "UVC Camera", "HD USB Camera" }; // , "ABKO APC930 QHD WEBCAM"
+	vector<string> names = { "HD USB Camera" , "UVC Camera" }; // { "HANA_1001", "HANA_1002", "HANA_1003", "HANA_1004", "ABKO APC930 QHD WEBCAM", }; 
 
 	int cam_num = names.size();
 	hr = GetInterfaces(cam_num);
@@ -409,7 +408,7 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int n
 			hr = Run();
 
 			hr = Read(pBuffer);
-		}	
+		}
 	}
 	ReleaseInterfaces();
 }
