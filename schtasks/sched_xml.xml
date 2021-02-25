@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-16"?>
+
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+
+  <RegistrationInfo>
+
+    <Date>2021-02-01T11:38:04.9997228</Date>
+
+    <Author>DESKTOP-8PBDPOV\구자인</Author> <!--아무이름 상관 없는 듯-->
+
+    <Description>start platform_intel</Description>
+
+    <URI>\SOYNET_INTEL</URI> <!-- 폴더 -->
+
+  </RegistrationInfo>
+
+  <Principals>
+
+    <Principal id="Author">
+
+      <UserId>S-1-5-21-4196549727-2589670255-3043106400-1001</UserId> 
+
+      <LogonType>Password</LogonType> <!-- create시 /RU ZAIIN4050\JAIN /RP password 붙여서 생성해야 함 -->
+                                      <!-- InteractiveToken : create시 유저, 패스워드 필요 x -->
+      <RunLevel>HighestAvailable</RunLevel>
+
+    </Principal>
+
+  </Principals>
+     <Settings>
+        <IdleSettings>
+           <StopOnIdleEnd>false</StopOnIdleEnd> <!--컴퓨터의 유휴 상태가 끝나면 중지-->
+           <RestartOnIdle>false</RestartOnIdle> <!--유휴 상태가 재개되면 다시 시작-->
+        </IdleSettings>
+        <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries> <!--컴퓨터의 AC 전원이 켜져 있는 경우에만 작업 시작-->
+        <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries> <!--컴퓨터가 배터리 전원으로 전환되는 경우 중지-->
+        <WakeToRun>true</WakeToRun> <!--이 작업을 실행하기 위해 절전 모드 종료-->
+        <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable> <!--네트워크 연결을 사용할 수 있는 경우에만 시작-->
+        <Enabled>true</Enabled>
+        <RestartOnFailure> <!--작업이 실패하는 경우 다시 시작-->
+	<Interval>PT1M</Interval> <!--다시 시작 간격-->
+	<Count>10</Count> <!-- 다음 횟수까지 다시 시작 시도-->
+        </RestartOnFailure>
+        <AllowStartOnDemand>true</AllowStartOnDemand> <!--요청 시 작업이 실행되도록 허용-->
+        <ExecutionTimeLimit>PT0S</ExecutionTimeLimit> <!--다음 시간 이상 작업이 실행되면 중지-->
+        <AllowHardTerminate>true</AllowHardTerminate> <!--요청할 때 실행 중인 작업이 끝나지 않으면 강제로 작업 중지-->
+        <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy> <!--작업이 이미 실행 중이면 다음 규칙 적용 -->
+        <Priority>7</Priority>
+    </Settings>
+    <Actions> <!-- 동작 -->
+        <Exec>
+            <WorkingDirectory>E:\device_intel\platform</WorkingDirectory>
+            <Command>test.bat</Command>
+        </Exec>
+    </Actions>
+</Task>
